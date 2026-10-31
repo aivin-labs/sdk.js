@@ -587,7 +587,7 @@ test('ai.prompt() a throwing onUpdate is caught and logged, not left to silently
   }
 });
 
-test('ai.cancel() calls the ai.cancel namespace with unique_request_id', async () => {
+test('ai.cancel() calls the ai.cancel namespace with both request_id and unique_request_id', async () => {
   const requests: InvokeRequest[] = [];
   const client = makeClient(async (req) => {
     requests.push(req);
@@ -598,11 +598,11 @@ test('ai.cancel() calls the ai.cancel namespace with unique_request_id', async (
 
   assert.equal(requests.length, 1);
   assert.equal(requests[0].namespace, 'ai.cancel');
-  assert.deepEqual(requests[0].params, { unique_request_id: 'req-123' });
+  assert.deepEqual(requests[0].params, { request_id: 'req-123', unique_request_id: 'req-123' });
   assert.deepEqual(result, { cancelled_locally: true });
 });
 
-test('ai.prompt() translates opts.request_id to the wire field unique_request_id (unlike opts.signal, it is NOT stripped)', async () => {
+test('ai.prompt() translates opts.request_id to wire fields request_id and unique_request_id (unlike opts.signal, it is NOT stripped)', async () => {
   const invokeCalls: InvokeRequest[] = [];
   const client = makeStreamingClient(
     () => { throw new Error('should not open a stream'); },
@@ -611,7 +611,7 @@ test('ai.prompt() translates opts.request_id to the wire field unique_request_id
 
   await client.ai.prompt('q', { request_id: 'req-456' });
 
-  assert.deepEqual(invokeCalls[0].params, { quest: 'q', opts: { unique_request_id: 'req-456' } });
+  assert.deepEqual(invokeCalls[0].params, { quest: 'q', opts: { request_id: 'req-456', unique_request_id: 'req-456' } });
 });
 
 test('browser.run() calls browser.run with mission and opts nested under data', async () => {
@@ -894,4 +894,102 @@ test('notification.push() forwards channels/priority/prompt/messageIsHtml as-is'
   assert.equal(requests[0].params.priority, 'urgent');
   assert.deepEqual(requests[0].params.channels, ['database', 'email']);
   assert.equal(requests[0].params.messageIsHtml, true);
+});
+
+test('ai.editImage() calls the ai.editImage namespace with instruction and opts', async () => {
+  const requests: InvokeRequest[] = [];
+  const client = makeClient(async (req) => {
+    requests.push(req);
+    return { url: 'https://example.com/edited.png' };
+  });
+
+  const result = await client.ai.editImage('remove background', { max_cost_usd: 0.05 });
+  assert.equal(requests[0].namespace, 'ai.editImage');
+  assert.deepEqual(requests[0].params, { instruction: 'remove background', opts: { max_cost_usd: 0.05 } });
+  assert.equal(result.url, 'https://example.com/edited.png');
+});
+
+test('signal.emit() and signal.stimulate() call signal namespace with nodeId and energy', async () => {
+  const requests: InvokeRequest[] = [];
+  const client = makeClient(async (req) => {
+    requests.push(req);
+    return { accepted: true };
+  });
+
+  await client.signal.emit('node-1', 0.8);
+  assert.equal(requests[0].namespace, 'signal.emit');
+  assert.deepEqual(requests[0].params, { nodeId: 'node-1', energy: 0.8 });
+
+  await client.signal.stimulate('node-2');
+  assert.equal(requests[1].namespace, 'signal.stimulate');
+  assert.deepEqual(requests[1].params, { nodeId: 'node-2', energy: undefined });
+});
+
+test('connector.getToken() and requestAccess() call connector namespace with params', async () => {
+  const requests: InvokeRequest[] = [];
+  const client = makeClient(async (req) => {
+    requests.push(req);
+    return { status: 'ok', provider: 'google', token: 'tok_abc' };
+  });
+
+  const res1 = await client.connector.getToken({ provider: 'google', scopes: ['calendar.read'] });
+  assert.equal(requests[0].namespace, 'connector.getToken');
+  assert.deepEqual(requests[0].params, { provider: 'google', scopes: ['calendar.read'] });
+  assert.equal(res1.status, 'ok');
+
+  const res2 = await client.connector.requestAccess({ provider: 'stripe', purpose: 'checkout' });
+  assert.equal(requests[1].namespace, 'connector.requestAccess');
+  assert.deepEqual(requests[1].params, { provider: 'stripe', purpose: 'checkout' });
+});
+
+test('table.evaluateFormula() and listSnapshots() validate and call table namespace', async () => {
+  const requests: InvokeRequest[] = [];
+  const client = makeClient(async (req) => {
+    requests.push(req);
+    return { result: 42 };
+  });
+
+  await client.table.evaluateFormula({ expression: 'SUM(A1:A5)', row: { A1: 10, A2: 32 } });
+  assert.equal(requests[0].namespace, 'table.evaluateFormula');
+  assert.deepEqual(requests[0].params, { expression: 'SUM(A1:A5)', row: { A1: 10, A2: 32 } });
+
+  await client.table.listSnapshots({ table_id: 'tbl_1', limit: 10 });
+  assert.equal(requests[1].namespace, 'table.listSnapshots');
+  assert.deepEqual(requests[1].params, { table_id: 'tbl_1', limit: 10 });
+});
+
+test('state.get() and state.set() call workspace plugin state methods', async () => {
+  const requests: InvokeRequest[] = [];
+  const client = makeClient(async (req) => {
+    requests.push(req);
+    return req.namespace === 'workspace.getPluginState' ? { cursor: 'c_123' } : { success: true };
+  });
+
+  const state = await client.state.get();
+  assert.equal(requests[0].namespace, 'workspace.getPluginState');
+  assert.deepEqual(requests[0].params, {});
+  assert.deepEqual(state, { cursor: 'c_123' });
+
+  await client.state.set({ cursor: 'c_456' });
+  assert.equal(requests[1].namespace, 'workspace.setPluginState');
+  assert.deepEqual(requests[1].params, { state: { cursor: 'c_456' } });
+});
+
+test('task.create() accepts skip_auto_fill and defer_auto_fill', async () => {
+  const requests: InvokeRequest[] = [];
+  const client = makeClient(async (req) => {
+    requests.push(req);
+    return { id: 't2' };
+  });
+
+  await client.task.create({
+    title: 'Fast task',
+    workspace_id: 'w1',
+    skip_auto_fill: true,
+    defer_auto_fill: false,
+  });
+
+  assert.equal(requests[0].namespace, 'task.createTask');
+  assert.equal((requests[0].params as any).skip_auto_fill, true);
+  assert.equal((requests[0].params as any).defer_auto_fill, false);
 });

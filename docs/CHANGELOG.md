@@ -2,6 +2,29 @@
 
 ## Unreleased
 
+## [1.2.0] - 2026-10-31
+
+### 🆕 Added — `connector` namespace for external credentials and access requests
+Manage third-party connections and tokens directly through `connector.getToken(connectorId, opts?)` and `connector.requestAccess(connectorId, permissions, opts?)`.
+
+### 🆕 Added — `signal` namespace for real-time reactive signals
+Emit and stimulate energy to graph nodes via `signal.emit(nodeId, energy)` and `signal.stimulate(nodeId, energy)`.
+
+### 🆕 Added — `state` namespace for scoped plugin state persistence
+Convenient key-value state persistence scoped per plugin via `state.get(key, scope?)` and `state.set(key, value, scope?)`, backed by `workspace.getPluginState` and `workspace.setPluginState`.
+
+### 🆕 Added — `table.evaluateFormula()` and `table.listSnapshots()`
+Added formula evaluation (`table.evaluateFormula`) and snapshot history queries (`table.listSnapshots`).
+
+### 🆕 Added — `ai.editImage()`
+Perform image manipulation, background removal, inpainting, and style transfer via `ai.editImage(instruction, opts?)`.
+
+### 🛠️ Fixed — `ai.prompt()` and `ai.cancel()` request ID alignment
+Sent both `request_id` (read by the backend) and `unique_request_id` (backward compatibility) to ensure in-flight generation cancellations are reliably matched by the host.
+
+### 🧹 Removed — `ai.ocr`
+Removed obsolete `ai.ocr` method as OCR handling is no longer part of the host engine.
+
 ### 🆕 Added — `ai.prompt()`/`ai.promptStream()` opts gain `price_rate`
 
 ```typescript

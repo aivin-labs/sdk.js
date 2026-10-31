@@ -99,7 +99,7 @@ Full reference: [sdk/ai.md](./sdk/ai.md).
 
 Verified against the backend's real implementation and registration -
 `getEmbeddings` and `rerank` in particular take different shapes than the old (wrong) docs
-implied, and `ocr`/`image`/`video` are real, backend-implemented RPCs this SDK didn't wire up until
+implied, and `image`/`video` are real, backend-implemented RPCs this SDK didn't wire up until
 recently.
 
 | Method                          | Description                                                                                                                          |
@@ -113,8 +113,8 @@ recently.
 | `tts(text, opts?)` / `stt(audio, opts?)` | Text-to-speech / speech-to-text.                                                                                              |
 | `getModels(provider?)`            | List available models, optionally filtered by provider.                                                                              |
 | `calculateTokens(data)`           | Estimate token usage for a prompt/payload without a real LLM call.                                                                    |
-| `ocr(image)`                      | Extract text from an image.                                                                                                           |
 | `image(prompt, opts?)` / `video(prompt, opts?)` | Generate an image/video from a text prompt — set `opts.max_cost_usd` unless cost is a non-concern. |
+| `editImage(instruction, opts?)`   | Edit an existing image (background removal, prompt-based edit, inpainting, upscaling).                |
 
 ## Knowledge & Vector (RAG) — `knowledge`, `vector`
 
@@ -229,7 +229,8 @@ Full reference: [sdk/file.md](./sdk/file.md), [sdk/resource.md](./sdk/resource.m
 [sdk/automation.md](./sdk/automation.md),
 [sdk/datasource.md](./sdk/datasource.md), [sdk/browser.md](./sdk/browser.md),
 [sdk/causality.md](./sdk/causality.md), [sdk/attachment.md](./sdk/attachment.md),
-[sdk/code.md](./sdk/code.md).
+[sdk/code.md](./sdk/code.md), [sdk/connector.md](./sdk/connector.md),
+[sdk/signal.md](./sdk/signal.md), [sdk/state.md](./sdk/state.md).
 
 | Method                                                                                                   | Description                                                              |
 | -------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------ |
@@ -247,6 +248,9 @@ Full reference: [sdk/file.md](./sdk/file.md), [sdk/resource.md](./sdk/resource.m
 | `attachment.search/.upload/.deepResearch/.evaluate/.queryTabularData/.queryMediaTimestamp/.extract`       | Attachment analysis helpers.                                             |
 | `message.init/.stream`                                                                                    | Init a placeholder message record / low-level streaming push into chat.  |
 | `code.executeLogic({ logic, args?, input_schema? })`                                                      | Execute arbitrary AI-generated/cached "business logic" with sandboxed args. |
+| `connector.getToken/.requestAccess`                                                                     | Vault credential broker for connected integrations (Stripe, Google, etc.). |
+| `signal.emit/.stimulate`                                                                                | Cognitive synapse & proactive reaction signals for autonomous agent behavior. |
+| `state.get/.set`                                                                                        | Persist and read accumulated workspace runtime state for this plugin. |
 
 ## Top-level shorthands
 

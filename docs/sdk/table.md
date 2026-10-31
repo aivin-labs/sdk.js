@@ -49,6 +49,8 @@ vocabulary (`op: count|sum|avg|min|max`, etc.).
 | `deduplicateTable` | `params: { table_id: string; workspace_id?: string; project_id?: string; strategy?: any }` | `Promise<any>` | Removes duplicate rows per `strategy`; returns a `snapshot_id` usable with `rollback`. |
 | `backfillColumn` | `params: { table_id: string; workspace_id?: string; project_id?: string; column_key: string; default_value?: any }` | `Promise<any>` | Fills a missing/new column with `default_value` across existing rows; returns a `snapshot_id` usable with `rollback`. |
 | `formatRowsForContext` | `params: { table_id: string; workspace_id?: string; project_id?: string; query?: string; token_budget?: number }` | `Promise<string>` | Formats matching rows into an LLM-context-ready string, bounded by `token_budget`. |
+| `evaluateFormula` | `params: { expression: string; row: Record<string, any>; table_id?: string; workspace_id?: string; project_id?: string }` | `Promise<any>` | Evaluates a formula expression against a row's values. |
+| `listSnapshots` | `params: { table_id: string; limit?: number; workspace_id?: string; project_id?: string }` | `Promise<any[]>` | Lists recent historical snapshots of a table, returning `snapshot_id`s usable with `rollback`. |
 
 ## `ensureTable` / `createTable` example
 

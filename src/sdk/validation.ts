@@ -418,3 +418,18 @@ export const formatRowsForContextParamsSchema = z.object({
   query: z.string().optional(),
   token_budget: z.number().optional(),
 });
+
+export const evaluateFormulaParamsSchema = z.object({
+  expression: z.string().min(1, 'expression is required'),
+  row: z.record(z.any()),
+  table_id: z.string().optional(),
+  workspace_id: z.string().optional(),
+  project_id: z.string().optional(),
+});
+
+export const listSnapshotsParamsSchema = z.object({
+  table_id: z.string().min(1, 'table_id is required'),
+  limit: z.number().int().positive().optional(),
+  workspace_id: z.string().optional(),
+  project_id: z.string().optional(),
+});

@@ -51,7 +51,7 @@ function extractSdkClientCalls(sdkClientPath) {
   const src = readFileSync(sdkClientPath, 'utf8');
   const calls = new Set();
   // this.call('namespace.method', ...) / this.call("namespace.method", ...)
-  const re = /this\.call(?:Stream)?(?:<[^>]*>)?\(\s*['"]([a-zA-Z0-9_]+\.[a-zA-Z0-9_]+)['"]/g;
+  const re = /this\.call(?:Stream|WithOptionalEvents)?(?:<[^>]*>)?\(\s*['"]([a-zA-Z0-9_]+\.[a-zA-Z0-9_]+)['"]/g;
   let m;
   while ((m = re.exec(src))) calls.add(m[1]);
   // `this.invokeStream({ namespace: 'x.y', ... })` (e.g. ai.promptStream) doesn't go through
@@ -146,7 +146,9 @@ function main() {
   const backendRegistrations = extractBackendRegistrations(beSrcRoot);
 
   const deadInSdkClient = [...sdkCalls].filter((c) => !backendRegistrations.has(c)).sort();
-  const missingSugar = [...backendRegistrations].filter((c) => !sdkCalls.has(c)).sort();
+  // Internal namespaces reserved for platform infrastructure / marketplace caller (MARKETPLACE_CALLER_ID)
+  const INTERNAL_NAMESPACES = [/^plugin\.(?!trigger$)/];
+  const missingSugar = [...backendRegistrations].filter((c) => !sdkCalls.has(c) && !INTERNAL_NAMESPACES.some((re) => re.test(c))).sort();
 
   console.log(`Scanned ${sdkCalls.size} SDKClient.ts call site(s) against ${backendRegistrations.size} backend registration(s).\n`);
 

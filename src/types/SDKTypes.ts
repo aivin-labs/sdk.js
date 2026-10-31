@@ -341,11 +341,25 @@ export interface LLMPromptOptions {
    * // ...cancelled from a completely different invocation later:
    * await ai.cancel(id);
    * ```
-   * Sent to the host as `unique_request_id` (a pre-existing tracking/audit id on the backend, not
-   * something introduced for cancellation) - renamed here only because that's a mouthful for
-   * something you'll type at every cancellable call site; translated on the way out.
+   * Sent to the host as both `request_id` and `unique_request_id` so the backend's
+   * cancellation and audit hooks can read either.
    */
   request_id?: string;
+}
+
+/**
+ * Result shape returned by `connector.getToken()` and `connector.requestAccess()`.
+ * Resolves credential status and vault tokens for third-party workspace integrations.
+ */
+export interface CredentialResult {
+  status: 'ok' | 'needs_auth' | 'needs_scope_upgrade' | 'rate_limited' | 'error';
+  provider: string;
+  token?: string;
+  refresh_token?: string;
+  expires_at?: number;
+  auth_url?: string;
+  metadata?: Record<string, any>;
+  error?: string;
 }
 
 /**
@@ -426,7 +440,7 @@ export interface ParsedLine {
   fields: Record<string, any>;
 }
 
-/** Verified against the backend's real behavior - the shape `ai.ocr` expects for its `image`
+/** Verified against the backend's real behavior - the shape expected for its `image`
  *  argument. Either `url` or `file` (base64 dataURL/Buffer) must actually resolve to real image
  *  bytes server-side; `id` is caller-chosen, not looked up. */
 export interface MediaItem {
@@ -568,6 +582,8 @@ export interface PluginContext {
   org_id?: string;
   client?: string;
   config?: Record<string, any>;
+  /** Plugin's accumulated state in the workspace (see sdk.state.get/set). */
+  state?: Record<string, any>;
   cert?: ConnectionInfo;
   metadata?: Record<string, any>;
 }

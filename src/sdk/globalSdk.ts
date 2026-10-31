@@ -68,6 +68,9 @@ export const setting = bindNamespace('setting');
 export const store = bindNamespace('store');
 export const redis = bindNamespace('redis');
 export const mongo = bindNamespace('mongo');
+export const connector = bindNamespace('connector');
+export const signal = bindNamespace('signal');
+export const state = bindNamespace('state');
 
 // ── Top-level method exports - `import { ask, hil, call } from '@aivin-labs/sdk'` ──────────────────
 export function call(func: string, params?: any, timeoutMs?: number) {

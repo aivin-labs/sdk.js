@@ -13,6 +13,7 @@ import {
   deleteJobParamsSchema,
   deleteTableParamsSchema,
   ensureTableParamsSchema,
+  evaluateFormulaParamsSchema,
   executeByIdParamSchema,
   formatRowsForContextParamsSchema,
   getAllTablesParamsSchema,
@@ -40,6 +41,7 @@ import {
   storeTransactionParamsSchema,
   storeUnlinkParamsSchema,
   tableIdScopedParamsSchema,
+  listSnapshotsParamsSchema,
   runFlowParamsSchema,
   updateJobParamsSchema,
   updateTableParamsSchema,
@@ -52,6 +54,7 @@ import type {
   AutomationJob,
   ClientLogEvent,
   ConnectionInfo,
+  CredentialResult,
   FlowStage,
   FlowStepResult,
   LLMPromptOptions,
@@ -452,7 +455,7 @@ export class SDKClient {
       // `request_id` DOES need to reach the host, just under its real field name - see
       // `LLMPromptOptions.request_id`'s doc comment for why the public name differs from the wire one.
       const { signal, request_id, ...restOpts } = opts ?? {};
-      const wireOpts = request_id ? { ...restOpts, unique_request_id: request_id } : restOpts;
+      const wireOpts = request_id ? { ...restOpts, request_id, unique_request_id: request_id } : restOpts;
       if (!driver) return this.call('ai.prompt', { quest, opts: wireOpts }, undefined, signal);
 
       // A caller's own listener callback throwing (a bug in THEIR code, not a transport failure)
@@ -588,7 +591,7 @@ export class SDKClient {
      * rejects with an aborted error on its own end shortly after).
      */
     cancel: (requestId: string): Promise<{ cancelled_locally: boolean }> =>
-      this.call('ai.cancel', { unique_request_id: requestId }),
+      this.call('ai.cancel', { request_id: requestId, unique_request_id: requestId }),
     getEmbedding: (
       text: string | string[],
       opts?: LLMPromptOptions,
@@ -607,13 +610,14 @@ export class SDKClient {
     getModels: (provider?: string): Promise<any> => this.call('ai.getModels', { provider }),
     calculateTokens: (data: Record<string, any>): Promise<any> =>
       this.call('ai.calculateTokens', { data }),
-    /** Extract text from an image via OCR. `image` needs either a real `url` or `file` (base64
-     *  dataURL/Buffer) - `id` is caller-chosen, not looked up server-side. */
-    ocr: (image: MediaItem): Promise<string> => this.call('ai.ocr', { image }),
     /** Generate an image from a text prompt. Set `opts.max_cost_usd` to cap spend - over-estimate
      *  auto-downgrades to a cheaper tier (or throws if none fits) instead of silently costing more. */
     image: (prompt: string, opts?: MediaPromptOptions): Promise<MediaGenerationResult> =>
       this.call('ai.image', { prompt, opts }),
+    /** Edit an existing image (background removal, prompt-based edit, inpainting, upscaling).
+     *  Original image URL and mask are passed via `opts.image_opts.input_image_url` / `mask_url`. */
+    editImage: (instruction: string, opts?: MediaPromptOptions): Promise<MediaGenerationResult> =>
+      this.call('ai.editImage', { instruction, opts }),
     /** Generate a video from a text prompt - same cost-guard/tier options as `image()`. Slower and
      *  more expensive than image generation; always set `opts.max_cost_usd` unless cost is a
      *  non-concern for this call site. */
@@ -857,6 +861,10 @@ export class SDKClient {
       limit?: number;
       threshold?: number;
     }): Promise<Agent[]> => this.call('workspace.searchAgents', params),
+    getPluginState: (params?: { plugin_id?: string }): Promise<any> =>
+      this.call('workspace.getPluginState', params ?? {}),
+    setPluginState: (params: { state: Record<string, any>; plugin_id?: string }): Promise<any> =>
+      this.call('workspace.setPluginState', params),
   };
 
   /**
@@ -1236,6 +1244,21 @@ export class SDKClient {
       token_budget?: number;
     }): Promise<string> =>
       this.call('table.formatRowsForContext', validateParams(formatRowsForContextParamsSchema, params, 'table.formatRowsForContext')),
+    evaluateFormula: (params: {
+      expression: string;
+      row: Record<string, any>;
+      table_id?: string;
+      workspace_id?: string;
+      project_id?: string;
+    }): Promise<any> =>
+      this.call('table.evaluateFormula', validateParams(evaluateFormulaParamsSchema, params, 'table.evaluateFormula')),
+    listSnapshots: (params: {
+      table_id: string;
+      limit?: number;
+      workspace_id?: string;
+      project_id?: string;
+    }): Promise<any[]> =>
+      this.call('table.listSnapshots', validateParams(listSnapshotsParamsSchema, params, 'table.listSnapshots')),
   };
 
   /**
@@ -1259,6 +1282,8 @@ export class SDKClient {
       workspace_id: string;
       from_date?: string;
       to_date?: string;
+      skip_auto_fill?: boolean;
+      defer_auto_fill?: boolean;
     }): Promise<Task> => this.call('task.createTask', params),
     update: (taskId: string, data: { status?: string; description?: string }): Promise<Task> =>
       this.call('task.updateTask', { task_id: taskId, ...data }),
@@ -1863,6 +1888,44 @@ export class SDKClient {
           this.call('storage.mongoAggregate', { collection, pipeline }),
       };
     },
+  };
+
+  /**
+   * Plugin-specific state storage in the workspace.
+   * Allows plugins to persist accumulated runtime data (template options, synced cursor, etc.).
+   */
+  readonly state = {
+    /** Read the plugin's accumulated state from the workspace. */
+    get: <T = Record<string, any>>(pluginId?: string): Promise<T | null> =>
+      this.call('workspace.getPluginState', pluginId ? { plugin_id: pluginId } : {}),
+    /** Persist shallow-merged state for this plugin in the workspace. */
+    set: (data: Record<string, any>, pluginId?: string): Promise<any> =>
+      this.call('workspace.setPluginState', { state: data, ...(pluginId ? { plugin_id: pluginId } : {}) }),
+  };
+
+  /**
+   * Vault credential broker for third-party workspace integrations (Stripe, Google, Notion, etc.).
+   * Scoped to the current workspace and execution tenant.
+   */
+  readonly connector = {
+    /** Resolve a connected credential token (ambient/shared per workspace). */
+    getToken: (params: { provider: string; scopes?: string[]; purpose?: string }): Promise<CredentialResult> =>
+      this.call('connector.getToken', params),
+    /** Request access to a credential with an explicit confirmation/consent prompt. */
+    requestAccess: (params: { provider: string; scopes?: string[]; purpose?: string }): Promise<CredentialResult> =>
+      this.call('connector.requestAccess', params),
+  };
+
+  /**
+   * Proactive reaction & cognitive synapse signals for autonomous agent behaviors.
+   */
+  readonly signal = {
+    /** Emit a proactive reaction signal to trigger autonomous cognitive behaviors. */
+    emit: (nodeId: string, energy?: number): Promise<{ accepted: boolean }> =>
+      this.call('signal.emit', { nodeId, energy }),
+    /** Stimulate a cognitive node in the synapse perception network. */
+    stimulate: (nodeId: string, energy?: number): Promise<{ accepted: boolean }> =>
+      this.call('signal.stimulate', { nodeId, energy }),
   };
 }
 

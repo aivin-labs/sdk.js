@@ -26,8 +26,8 @@ import { ai } from '@aivin-labs/sdk';
 | `stt` | `audio: any`, `opts?: Record<string, any>` | `Promise<any>` | Speech-to-text. Maps to `ai.stt` on the host. |
 | `getModels` | `provider?: string` | `Promise<any>` | Lists available models, optionally filtered by `provider`. Maps to `ai.getModels`. |
 | `calculateTokens` | `data: Record<string, any>` | `Promise<any>` | Estimates token usage for a given prompt/payload without making a real LLM call. Maps to `ai.calculateTokens`. |
-| `ocr` | `image: MediaItem` | `Promise<string>` | Extracts text from an image. `image` needs either a real `url` or `file` (base64 dataURL/Buffer) — `id` is caller-chosen, not looked up server-side. |
-| `image` | `prompt: string`, `opts?: MediaPromptOptions` | `Promise<MediaGenerationResult>` | Generates an image from a text prompt. See [Generating images and video](#generating-images-and-video-with-ocr-image-video) below — set `opts.max_cost_usd` unless cost is a non-concern. |
+| `image` | `prompt: string`, `opts?: MediaPromptOptions` | `Promise<MediaGenerationResult>` | Generates an image from a text prompt. See [Generating images and video](#generating-images-and-video-with-image-editimage-video) below — set `opts.max_cost_usd` unless cost is a non-concern. |
+| `editImage` | `instruction: string`, `opts?: MediaPromptOptions` | `Promise<MediaGenerationResult>` | Edits an existing image (background removal, prompt-based edit, inpainting, upscaling). Original image URL and mask are passed via `opts.image_opts.input_image_url` / `mask_url`. |
 | `video` | `prompt: string`, `opts?: MediaPromptOptions` | `Promise<MediaGenerationResult>` | Generates a video from a text prompt — same options as `image`, slower and more expensive. |
 
 `LLMPromptOptions` (from `src/types/SDKTypes.ts`), applies to `prompt`, `getEmbedding`, and
@@ -498,23 +498,20 @@ the backend for background jobs. `cancelled_locally` in the return value only re
 specific backend node happened to have it running - `false` does not mean the cancel failed, just
 that it had to reach a different node.
 
-## Generating images and video with ocr, image, video
+## Generating images and video with image, editImage, video
 
-`ai.ocr`/`ai.image`/`ai.video` were implemented on the backend long before they were wired into this
+`ai.image`/`ai.editImage`/`ai.video` were implemented on the backend long before they were wired into this
 SDK - they're real, reachable RPCs, not new functionality:
 
 ```typescript
 import { ai } from '@aivin-labs/sdk';
 
 export async function main(mission, input, ctx) {
-  // OCR - image needs a real `url` or `file` (base64 dataURL/Buffer); `id` is caller-chosen
-  const text = await ai.ocr({ id: 'scan-1', url: input.image_url });
-
   // Image generation - max_cost_usd is the one option worth setting: over-estimate auto-downgrades
   // to a cheaper tier (or throws if none fits) instead of silently costing more than expected
-  const image = await ai.image(`A diagram illustrating: ${text}`, { max_cost_usd: 0.05 });
+  const image = await ai.image(`A diagram illustrating: `, { max_cost_usd: 0.05 });
 
-  return { status: 'success', data: { text, image_url: image.url } };
+  return { status: 'success', data: { image_url: image.url } };
 }
 ```
 
