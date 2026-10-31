@@ -23,7 +23,7 @@
     "build": "tsc && npm run copy:proto",
     "copy:proto": "node -e \"require('fs').mkdirSync('dist/proto',{recursive:true});require('fs').copyFileSync('src/proto/sdk_transport.proto','dist/proto/sdk_transport.proto')\"",
     "dev": "tsc --watch",
-    "clean": "rimraf dist",
+    "clean": "node -e \"require('fs').rmSync('dist', { recursive: true, force: true })\"",
     "lint": "eslint .",
     "format": "prettier --write .",
     "test": "node --import tsx --test test/pluginTypes.test.ts test/grpcInvoker.test.ts test/grpcInvokerStream.test.ts test/sdkClient.test.ts test/trace.test.ts test/testUtils.test.ts test/pluginServer.test.ts test/pluginWorkerHost.test.ts test/standalone.test.ts",

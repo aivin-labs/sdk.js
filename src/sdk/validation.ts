@@ -421,7 +421,7 @@ export const formatRowsForContextParamsSchema = z.object({
 
 export const evaluateFormulaParamsSchema = z.object({
   expression: z.string().min(1, 'expression is required'),
-  row: z.record(z.any()),
+  row: z.record(z.string(), z.any()),
   table_id: z.string().optional(),
   workspace_id: z.string().optional(),
   project_id: z.string().optional(),
